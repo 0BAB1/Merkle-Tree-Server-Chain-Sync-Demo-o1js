@@ -1,3 +1,3 @@
-import { Add } from './Add.js';
+import {MerkleWitness10, TreeM} from "./TreeM";
 
-export { Add };
+export {MerkleWitness10, TreeM};
