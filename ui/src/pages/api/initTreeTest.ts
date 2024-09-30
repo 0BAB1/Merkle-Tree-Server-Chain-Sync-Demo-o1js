@@ -12,12 +12,13 @@ export default async function handler(
   if (req.method === 'POST') {
     // instantiate an empty merkle tree of height 10 for now
     const initialTree = new MerkleTree(10);
+    initialTree.setLeaf(10n,Field(111));
     
     const jsonString = JSON.stringify(initialTree, null, 2);
 
     try {
         await fs.writeFile(dataFilePath, jsonString);
-        console.log('MerkleTree init success ! tree was init empty.');
+        console.log('MerkleTree init success ! leaf 10n was set to value Field(111) as initial value to tinker with');
       } catch (error) {
         console.error('Error writing to file', error);
       }

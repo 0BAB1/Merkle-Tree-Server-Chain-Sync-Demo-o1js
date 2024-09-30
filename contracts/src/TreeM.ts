@@ -1,12 +1,20 @@
-import {SmartContract, state, Field, State, method, MerkleWitness} from "o1js";
+import {SmartContract, state, Field, State, method, MerkleWitness, MerkleTree} from "o1js";
 
 export class MerkleWitness10 extends MerkleWitness(10){};
 
 export class TreeM extends SmartContract{
     @state(Field) treeRoot = State<Field>();
 
-    @method async initState(initialRoot : Field){
-        this.treeRoot.set(initialRoot);
+    init(): void {
+        const tempInitTree = new MerkleTree(10);
+        this.treeRoot.set(tempInitTree.getRoot());
+    }
+
+    @method async initState(root : Field){
+        /**
+         * Still here for demo purposes
+         */
+        this.treeRoot.set(root);
     }
 
     @method async update(

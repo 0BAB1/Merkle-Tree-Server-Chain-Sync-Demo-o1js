@@ -9,6 +9,15 @@
       "feepayerAlias": "03-deploy",
       "fee": "0.1",
       "smartContract": "TreeM"
+    },
+    "aze": {
+      "networkId": "testnet",
+      "url": "https://api.minascan.io/node/devnet/v1/graphql",
+      "keyPath": "keys/aze.json",
+      "feepayerKeyPath": "/home/rootmin/.cache/zkapp-cli/keys/03-deploy.json",
+      "feepayerAlias": "03-deploy",
+      "fee": "0.2",
+      "smartContract": "TreeM"
     }
   }
 }
