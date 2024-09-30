@@ -1,13 +1,13 @@
 # API
 
-## getData
+## getTree
 
-get off-chain data from database (implemented as a JSON file)
+get off-chain data from database (implemented as a JSON file for light-weight proof-of-concepts & demos)
 
-## sendProofAndUpdate
+## updateTree
 
-sends the proof to the mina block chain and update off chain data on the server
+updates the server tree base on the "tree" element in the POST resquest
 
 ## initTree
 
-instantiate an empty tree on the server for the 1st run.
+instantiate an empty tree on the server.

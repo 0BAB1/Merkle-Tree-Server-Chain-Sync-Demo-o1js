@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     try {
       console.log(req.body);
-      const { tree  } = req.body;
+      const { tree } = req.body;
       const newTree = new MerkleTree(tree.height);
       newTree.nodes = tree.nodes;
       

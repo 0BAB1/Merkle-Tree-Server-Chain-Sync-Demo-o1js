@@ -1,9 +1,17 @@
-import {MerkleTree,Provable, Field, Struct, UInt32, UInt64, Bool, Int64, CircuitString, Signature, PublicKey, PrivateKey, Mina, AccountUpdate} from "o1js";
+import {MerkleTree, Field, PrivateKey, Mina, AccountUpdate} from "o1js";
 import {MerkleWitness10, TreeM} from  "./TreeM.js";
-import { console_log } from "o1js/dist/node/bindings/compiled/node_bindings/plonk_wasm.cjs";
-import { promises as fs } from 'fs';
+
+/**
+ * This file shows a basic example on how to use the API calls and interact with the merkle tree contract on chain
+ * For tou own proofs of concept
+ */
 
 async function fetchTree() : Promise<MerkleTree>{
+    /**
+     * This function fetches merkleTree data from the server.
+     * It implements a custom deserialization of the data to enable full
+     * compatibility.
+     */
     const res = await fetch('http://localhost:3000/api/getTree');
     if (!res.ok) {
         throw new Error(`Error: ${res.status}`);
@@ -71,7 +79,9 @@ await pendingDeployTx.wait();
 
 // INTERACTION
 
+// -----------------------------------------------------------------
 // STEP 1 : FETCH FULL MERKLE TREE FROM SERVER
+
 console.log("fetching data from the server...");
 
 const serverTree = await fetchTree();
@@ -80,7 +90,8 @@ console.log("sending TX..");
 // We want to modify leaf #500
 const witness = new MerkleWitness10(initialTree.getWitness(111n));
 
-// STEP 3 and 4 : Create transaction, run proof, sign
+// -----------------------------------------------------------------
+// STEP 2 : Apply desired changes. Create transaction, run proof, sign, send
 
 const incrementTx = Mina.transaction(senderAccount, async () =>{
     await zkAppMerkleTreeInstance.update(
@@ -88,7 +99,7 @@ const incrementTx = Mina.transaction(senderAccount, async () =>{
         Field(0),
         Field(9));
 });
-// attack vetor. people can just send TX and tinker to not update on the server
+// TODO ! Attack vector example : people can just send TX and tinker to not update on the server
 // this would fuck up the app but would not b reak the trust.
 // anyway, if i want to really sync server tree and Smartcontract state, server has to be the one appronving too
 // maybe is it possble to get the prrof in the server and requet a server PK sign in order to apply chages to state ?
@@ -96,7 +107,9 @@ const incrementTx = Mina.transaction(senderAccount, async () =>{
 await incrementTx.prove();
 await incrementTx.sign([senderKey, zkAppPrivateKey]).send().wait();
 
-// Update server merkle tree
+// -----------------------------------------------------------------
+// Step 3 : Update loacl merkle tree and sync up the server
+
 serverTree.setLeaf(500n, Field(0).add(Field(9))); // redundant but to display underlying logic
 const res2 = await fetch('http://localhost:3000/api/updateTree', {
     method: 'POST',
@@ -108,9 +121,7 @@ const res2 = await fetch('http://localhost:3000/api/updateTree', {
     }), // Convert the object to a JSON string
 });
 
-// if the TX was a succes, update tree l
-
-// compare the root of the smart contract tree to our local tree
+// compare the root of the smart contract tree to our local tree, alegedly the one now present on the server
 console.log(
     `BasicMerkleTree: local OffChainTree root hash before send1: ${serverTree.getRoot()}`
 );
