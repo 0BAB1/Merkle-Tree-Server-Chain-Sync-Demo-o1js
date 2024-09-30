@@ -11,17 +11,14 @@ export default async function handler(
     res : NextApiResponse) {
   if (req.method === 'POST') {
     // instantiate an empty merkle tree of height 10 for now
-    const initialTree : MerkleTree = new MerkleTree(10);
+    const initialTree = new MerkleTree(10);
     initialTree.setLeaf(10n,Field(111));
-    for(let i = 0; i < 10; i++){
-      console.log(initialTree.zeroes[i].toString());
-    }
     
     const jsonString = JSON.stringify(initialTree, null, 2);
 
     try {
         await fs.writeFile(dataFilePath, jsonString);
-        console.log('MerkleTree init success.');
+        console.log('MerkleTree init success ! leaf 10n was set to value Field(111) as initial value to tinker with');
       } catch (error) {
         console.error('Error writing to file', error);
       }

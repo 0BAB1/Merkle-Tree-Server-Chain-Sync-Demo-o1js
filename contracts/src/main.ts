@@ -2,8 +2,14 @@ import {MerkleTree, Field, PrivateKey, Mina, AccountUpdate} from "o1js";
 import {MerkleWitness10, TreeM} from  "./TreeM.js";
 
 /**
- * This file shows a basic example on how to use the API calls and interact with the merkle tree contract on chain
- * For tou own proofs of concept
+ *  This file shows a basic example on how to use the API calls and interact with the merkle tree contract on chain
+ *  For tou own proofs of concept.
+ * 
+ *  Don't forget to send a post request to the "initTree" API using curl or postman to set the server @ the right state
+ * 
+ *  npm run build
+ * 
+ *  node build/src/main.js
  */
 
 async function fetchTree() : Promise<MerkleTree>{
@@ -85,10 +91,18 @@ await pendingDeployTx.wait();
 console.log("fetching data from the server...");
 
 const serverTree = await fetchTree();
+// serverTree.setLeaf(10n,Field(110)); // comment or uncomment this to show example of tempering with data
 
 console.log("sending TX..");
-// We want to modify leaf #500
-const witness = new MerkleWitness10(initialTree.getWitness(111n));
+// We want to modify leaf #10
+const witness = new MerkleWitness10(serverTree.getWitness(10n));
+// log hashes before
+console.log(
+    `BasicMerkleTree: local OffChainTree root hash befoer send1: ${serverTree.getRoot()}`
+);
+console.log(
+    `BasicMerkleTree: TreeM contract root hash before send1: ${zkAppMerkleTreeInstance.treeRoot.get()}`
+);
 
 // -----------------------------------------------------------------
 // STEP 2 : Apply desired changes. Create transaction, run proof, sign, send
@@ -96,7 +110,7 @@ const witness = new MerkleWitness10(initialTree.getWitness(111n));
 const incrementTx = Mina.transaction(senderAccount, async () =>{
     await zkAppMerkleTreeInstance.update(
         witness,
-        Field(0),
+        serverTree.getLeaf(10n),
         Field(9));
 });
 // TODO ! Attack vector example : people can just send TX and tinker to not update on the server
@@ -110,7 +124,7 @@ await incrementTx.sign([senderKey, zkAppPrivateKey]).send().wait();
 // -----------------------------------------------------------------
 // Step 3 : Update loacl merkle tree and sync up the server
 
-serverTree.setLeaf(500n, Field(0).add(Field(9))); // redundant but to display underlying logic
+serverTree.setLeaf(10n, Field(111).add(Field(9)));
 const res2 = await fetch('http://localhost:3000/api/updateTree', {
     method: 'POST',
     headers: {
@@ -123,7 +137,7 @@ const res2 = await fetch('http://localhost:3000/api/updateTree', {
 
 // compare the root of the smart contract tree to our local tree, alegedly the one now present on the server
 console.log(
-    `BasicMerkleTree: local OffChainTree root hash before send1: ${serverTree.getRoot()}`
+    `BasicMerkleTree: local OffChainTree root hash after send1: ${serverTree.getRoot()}`
 );
 console.log(
     `TreeM: smart contract root hash after send1: ${zkAppMerkleTreeInstance.treeRoot.get()}`
