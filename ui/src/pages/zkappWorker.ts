@@ -1,16 +1,18 @@
-import { Mina, PublicKey, fetchAccount, Field } from 'o1js';
+import { Mina, PublicKey, fetchAccount, Field, MerkleTree, MerkleWitness } from 'o1js';
 
 type Transaction = Awaited<ReturnType<typeof Mina.transaction>>;
 
 // ---------------------------------------------------------------------------------------
 
-import type { TreeM, MerkleWitness10} from '../../../contracts/src/TreeM';
+import { TreeM } from '../../../contracts/src/TreeM';
 
 const state = {
   TreeM: null as null | typeof TreeM,
   zkapp: null as null | TreeM,
   transaction: null as null | Transaction,
 };
+
+class MerkleWitness10 extends MerkleWitness(10){}
 
 // ---------------------------------------------------------------------------------------
 
@@ -42,12 +44,28 @@ const functions = {
     return JSON.stringify(currentRoot.toJSON());
   },
   createUpdateTransaction: async (args: {
-    witness : MerkleWitness10,
-    numberBefore : Field,
-    incrementAmount : Field
+    treeJson : string,
+    leaf : string,
+    numberBefore : string,
+    incrementAmount : string
   }) => {
     const transaction = await Mina.transaction(async () => {
-      await state.zkapp!.update(args.witness, args.numberBefore, args.incrementAmount);
+      // get the JSON stringified tree representation and deserielize it
+      const treeObject = JSON.parse(args.treeJson);
+      const tempTree = new MerkleTree(10);
+      for (const [nodeKey , nodeValue] of Object.entries<{}>(treeObject.tree.nodes)) {
+        for (const [innerKey, innerValue ] of Object.entries<string>(nodeValue)) {
+          tempTree.nodes[Number(nodeKey)] = {};
+          tempTree.nodes[Number(nodeKey)][innerKey] = Field(BigInt(innerValue));
+        }
+      }
+      //loading zeroes
+      for(let i = 0; i < 10; i++){
+        tempTree.zeroes[i] = Field(BigInt(treeObject.tree.zeroes[i]));
+      }
+      // generate a witness to send to the contract
+      const tempWitness = new MerkleWitness10(tempTree.getWitness(BigInt(args.leaf)));
+      await state.zkapp!.update(tempWitness, Field(Number(args.numberBefore)), Field(Number(args.incrementAmount)));
     });
     state.transaction = transaction;
   },

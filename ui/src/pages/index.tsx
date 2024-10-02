@@ -1,13 +1,13 @@
-import { Field, PublicKey, MerkleTree } from 'o1js';
+import { Field, PublicKey, MerkleTree, MerkleWitness } from 'o1js';
 import { useEffect, useState } from 'react';
-import GradientBG from '../components/GradientBG.js';
-import styles from '../styles/Home.module.css';
 import './reactCOIServiceWorker';
 import ZkappWorkerClient from './zkappWorkerClient';
-import {MerkleWitness10} from "../../../contracts/src/TreeM.js"
+import { ChangeEvent, FormEvent } from 'react';
 
 let transactionFee = 0.1;
 const ZKAPP_ADDRESS = 'B62qpbRHo9Wy8YA4Xyoo8V5KNKZBWeSfAAM9NcJzfsAQoNBZRADY1EZ';
+
+class MerkleWitness10 extends MerkleWitness(10){}
 
 async function fetchTree() : Promise<MerkleTree>{
   /**
@@ -52,6 +52,12 @@ export default function Home() {
 
   const [displayText, setDisplayText] = useState('');
   const [transactionlink, setTransactionLink] = useState('');
+
+  const [userInputValue, setUserInputValue] = useState('');
+  const [userInputLeaf, setUserInputLeaf] = useState('');
+
+  // Local merkle tree HAVE TO SYNC WITH SERVER AFER CHAIN IS UPDATED
+  const [localMerkleTree, setLocalMerkleTree] = useState(new MerkleTree(10));
 
   // -------------------------------------------------------
   // Do Setup
@@ -106,6 +112,13 @@ export default function Home() {
         console.log('zkApp compiled');
         setDisplayText('zkApp compiled...');
 
+        setDisplayText('Fetching server Merkle Tree...');
+        console.log("fetching tree from server...");
+        const localTree = await fetchTree();
+        setLocalMerkleTree(localTree);
+        setDisplayText('Server Merkle Tree fetched...');
+        console.log("tree fetched");
+
         const zkappPublicKey = PublicKey.fromBase58(ZKAPP_ADDRESS);
 
         await zkappWorkerClient.initZkappInstance(zkappPublicKey);
@@ -113,8 +126,8 @@ export default function Home() {
         console.log('Getting zkApp state...');
         setDisplayText('Getting zkApp state...');
         await zkappWorkerClient.fetchAccount({ publicKey: zkappPublicKey });
-        const currentNum = await zkappWorkerClient.getRoot();
-        console.log(`Current state in zkApp: ${currentNum.toString()}`);
+        const currentRoot = await zkappWorkerClient.getRoot();
+        console.log(`Current state in zkApp: ${currentRoot.toString()}`);
         setDisplayText('');
 
         setState({
@@ -125,7 +138,7 @@ export default function Home() {
           publicKey,
           zkappPublicKey,
           accountExists,
-          currentNum,
+          currentRoot,
         });
       }
     })();
@@ -157,7 +170,8 @@ export default function Home() {
   // -------------------------------------------------------
   // Send a transaction
 
-  const onSendTransaction = async () => {
+  const onSendTransaction = async (event : FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setState({ ...state, creatingTransaction: true });
 
     setDisplayText('Creating a transaction...');
@@ -167,7 +181,23 @@ export default function Home() {
       publicKey: state.publicKey!,
     });
 
-    await state.zkappWorkerClient!.createUpdateTransaction();
+    setDisplayText('Generating witness...');
+    console.log('Generating witness...');
+
+    const tempWitness = new MerkleWitness10(localMerkleTree.getWitness(BigInt(userInputLeaf)));
+
+    setDisplayText('Witeness generated !');
+    console.log('Witness generated !');
+
+    setDisplayText('Generating TX !');
+    console.log('Generating TX !');
+
+    await state.zkappWorkerClient!.createUpdateTransaction(
+      JSON.stringify({tree : localMerkleTree}),
+      userInputLeaf,
+      String(localMerkleTree.getLeaf(BigInt(userInputLeaf))),
+      userInputValue
+    );  
 
     setDisplayText('Creating proof...');
     console.log('Creating proof...');
@@ -199,16 +229,16 @@ export default function Home() {
   // -------------------------------------------------------
   // Refresh the current state
 
-  const onRefreshCurrentNum = async () => {
+  const onRefreshCurrentRoot = async () => {
     console.log('Getting zkApp state...');
     setDisplayText('Getting zkApp state...');
 
     await state.zkappWorkerClient!.fetchAccount({
       publicKey: state.zkappPublicKey!,
     });
-    const currentNum = await state.zkappWorkerClient!.getNum();
-    setState({ ...state, currentNum });
-    console.log(`Current state in zkApp: ${currentNum.toString()}`);
+    const currentRoot = await state.zkappWorkerClient!.getRoot();
+    setState({ ...state, currentRoot });
+    console.log(`Current state in zkApp: ${currentRoot.toString()}`);
     setDisplayText('');
   };
 
@@ -231,7 +261,6 @@ export default function Home() {
       href={transactionlink}
       target="_blank"
       rel="noreferrer"
-      style={{ textDecoration: 'underline' }}
     >
       View transaction
     </a>
@@ -240,10 +269,7 @@ export default function Home() {
   );
 
   let setup = (
-    <div
-      className={styles.start}
-      style={{ fontWeight: 'bold', fontSize: '1.5rem', paddingBottom: '5rem' }}
-    >
+    <div>
       {stepDisplay}
       {hasWallet}
     </div>
@@ -255,7 +281,7 @@ export default function Home() {
       'https://faucet.minaprotocol.com/?address=' + state.publicKey!.toBase58();
     accountDoesNotExist = (
       <div>
-        <span style={{ paddingRight: '1rem' }}>Account does not exist.</span>
+        <span>Account does not exist.</span>
         <a href={faucetLink} target="_blank" rel="noreferrer">
           Visit the faucet to fund this fee payer account
         </a>
@@ -266,33 +292,51 @@ export default function Home() {
   let mainContent;
   if (state.hasBeenSetup && state.accountExists) {
     mainContent = (
-      <div style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <div className={styles.center} style={{ padding: 0 }}>
-          Current state in zkApp: {state.currentNum!.toString()}{' '}
+      <div>
+        <div>
+          Current state in zkApp: {state.currentRoot!.toString()}{' '} <br></br>
+          Current local tree root : {localMerkleTree.getRoot().toString()}
         </div>
-        <button
-          className={styles.card}
-          onClick={onSendTransaction}
-          disabled={state.creatingTransaction}
-        >
-          Send Transaction
-        </button>
-        <button className={styles.card} onClick={onRefreshCurrentNum}>
-          Get Latest State
-        </button>
+        <div>
+          <form onSubmit={onSendTransaction}>
+            <input
+              type="text"
+              value={userInputValue}
+              onChange={ (event : ChangeEvent<HTMLInputElement>) : void => {
+                setUserInputValue(event.target.value);
+              }}
+              placeholder="Increment amount"
+            />
+            <input
+              type="text"
+              value={userInputLeaf.toString()}
+              onChange={ (event : ChangeEvent<HTMLInputElement>) : void => {
+                setUserInputLeaf(event.target.value);
+              }}
+              placeholder="Leaf ID"
+            />
+            <button 
+              type="submit"
+              // disabled = {state.creatingTransaction}
+            >
+              Increment the data
+            </button>
+          </form>
+          <button onClick={onRefreshCurrentRoot}>
+            Get Latest State
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <GradientBG>
-      <div className={styles.main} style={{ padding: 0 }}>
-        <div className={styles.center} style={{ padding: 0 }}>
-          {setup}
-          {accountDoesNotExist}
-          {mainContent}
-        </div>
+    <>
+      <div>
+        {setup}
+        {accountDoesNotExist}
+        {mainContent}
       </div>
-    </GradientBG>
+    </>
   );
 }

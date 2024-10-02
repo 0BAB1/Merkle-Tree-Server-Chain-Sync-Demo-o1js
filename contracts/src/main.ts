@@ -47,6 +47,8 @@ async function fetchTree() : Promise<MerkleTree>{
 const zkAppPrivateKey = PrivateKey.random();
 const zkAppPublicKey = zkAppPrivateKey.toPublicKey();
 
+console.log(Field(Field(BigInt("0"))));
+
 const zkAppMerkleTreeInstance = new TreeM(zkAppPublicKey);
 await TreeM.compile();
 

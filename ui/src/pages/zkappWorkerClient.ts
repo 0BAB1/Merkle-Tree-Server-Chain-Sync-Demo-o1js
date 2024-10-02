@@ -45,14 +45,16 @@ export default class ZkappWorkerClient {
   }
 
   createUpdateTransaction(
-    witness : MerkleWitness10,
-    numberBefore : Field,
-    incrementAmount : Field
+    treeJson : string,
+    leaf : string,
+    numberBefore : string,
+    incrementAmount : string
   ) {
     return this._call('createUpdateTransaction', {
-      witness : witness,
-      numberBefore : numberBefore,
-      incrementAmount : incrementAmount
+      treeJson,
+      leaf,
+      numberBefore,
+      incrementAmount
     });
   }
 
