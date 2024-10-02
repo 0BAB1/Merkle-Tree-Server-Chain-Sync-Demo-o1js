@@ -4,6 +4,7 @@ import './reactCOIServiceWorker';
 import ZkappWorkerClient from './zkappWorkerClient';
 import { ChangeEvent, FormEvent } from 'react';
 import { stat } from 'fs';
+import {Tooltip} from "../components/ToolTipsProps"
 
 let transactionFee = 0.1;
 const ZKAPP_ADDRESS = 'B62qpbRHo9Wy8YA4Xyoo8V5KNKZBWeSfAAM9NcJzfsAQoNBZRADY1EZ';
@@ -74,6 +75,8 @@ export default function Home() {
 
   // Local merkle tree HAVE TO SYNC WITH SERVER AFER CHAIN IS UPDATED
   const [localMerkleTree, setLocalMerkleTree] = useState(new MerkleTree(10));
+  // Server tree for sync information
+  const [fetchedServerMerkleTree, setFetchedServerMerkleTree] = useState(new MerkleTree(10));
 
   // -------------------------------------------------------
   // Do Setup
@@ -130,8 +133,9 @@ export default function Home() {
 
         setDisplayText('Fetching server Merkle Tree...');
         console.log("fetching tree from server...");
-        const localTree = await fetchTree();
-        setLocalMerkleTree(localTree);
+        const fetchedTree = await fetchTree();
+        setLocalMerkleTree(fetchedTree);
+        setFetchedServerMerkleTree(fetchedTree);
         setDisplayText('Server Merkle Tree fetched...');
         console.log("tree fetched");
 
@@ -274,9 +278,9 @@ export default function Home() {
   // Refresh the current state
 
   const onRefreshCurrentRoot = async () => {
+    // Get the contract Infos
     console.log('Getting zkApp state...');
     setDisplayText('Getting zkApp state...');
-
     await state.zkappWorkerClient!.fetchAccount({
       publicKey: state.zkappPublicKey!,
     });
@@ -284,6 +288,9 @@ export default function Home() {
     setState({ ...state, currentRoot });
     console.log(`Current state in zkApp: ${currentRoot.toString()}`);
     setDisplayText('');
+
+    // Get the server infos
+    setFetchedServerMerkleTree(await fetchTree());
   };
 
   // -------------------------------------------------------
@@ -337,9 +344,19 @@ export default function Home() {
   if (state.hasBeenSetup && state.accountExists) {
     mainContent = (
       <div>
-        <div>
-          Current state in zkApp: {state.currentRoot!.toString()}{' '} <br></br>
-          Current local tree root : {localMerkleTree.getRoot().toString()}
+        <div className='status-wrapper'>
+          <Tooltip text={"Local tree root : " + localMerkleTree.getRoot().toString().slice(0,7) + "... Chain state : " + state.currentRoot!.toString().slice(0,7)+ "..."} >
+            <div className='status'>
+              Local Sync w.r.t. Chain
+              <div className={(localMerkleTree.getRoot().toString() == state.currentRoot?.toString()) ? "status-okay" : "status-not-okay"}></div>
+            </div>
+          </Tooltip>
+          <Tooltip text={"Last fetched server root : " + localMerkleTree.getRoot().toString().slice(0,7) + "... Chain state : " + state.currentRoot!.toString().slice(0,7)+ "..."}>
+            <div className='status'>
+              Server Sync w.r.t. Chain
+              <div className={(localMerkleTree.getRoot().toString() == state.currentRoot?.toString()) ? "status-okay" : "status-not-okay"}></div>
+            </div>
+          </Tooltip>
         </div>
         <div>
 
@@ -355,6 +372,7 @@ export default function Home() {
             <button 
               type="submit"
               disabled = {state.creatingTransaction}
+              className='button'
             >
               Search
             </button>
@@ -397,6 +415,7 @@ export default function Home() {
   return (
     <>
       <div>
+        <h1>Merkle Tree MINA Demo</h1>
         {setup}
         {accountDoesNotExist}
         {mainContent}
