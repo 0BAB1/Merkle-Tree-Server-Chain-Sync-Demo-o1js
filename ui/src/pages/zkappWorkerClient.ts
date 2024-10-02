@@ -62,8 +62,8 @@ export default class ZkappWorkerClient {
     return this._call('proveUpdateTransaction', {});
   }
 
-  async getTransactionJSON() {
-    const result = await this._call('getTransactionJSON', {});
+  async getTransactionJSON() : Promise<string>{
+    const result : string = await this._call('getTransactionJSON', {});
     return result;
   }
 
@@ -88,7 +88,7 @@ export default class ZkappWorkerClient {
     };
   }
 
-  _call(fn: WorkerFunctions, args: any) {
+  _call(fn: WorkerFunctions, args: any): any {
     return new Promise((resolve, reject) => {
       this.promises[this.nextId] = { resolve, reject };
 

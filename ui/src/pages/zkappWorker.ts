@@ -72,7 +72,7 @@ const functions = {
   proveUpdateTransaction: async (args: {}) => {
     await state.transaction!.prove();
   },
-  getTransactionJSON: async (args: {}) => {
+  getTransactionJSON: async (args: {}) :Promise<string> => {
     return state.transaction!.toJSON();
   },
 };

@@ -1,8 +1,9 @@
-import { Field, PublicKey, MerkleTree, MerkleWitness } from 'o1js';
+import { Field, PublicKey, MerkleTree, MerkleWitness, PendingTransaction } from 'o1js';
 import { useEffect, useState } from 'react';
 import './reactCOIServiceWorker';
 import ZkappWorkerClient from './zkappWorkerClient';
 import { ChangeEvent, FormEvent } from 'react';
+import { stat } from 'fs';
 
 let transactionFee = 0.1;
 const ZKAPP_ADDRESS = 'B62qpbRHo9Wy8YA4Xyoo8V5KNKZBWeSfAAM9NcJzfsAQoNBZRADY1EZ';
@@ -38,6 +39,19 @@ async function fetchTree() : Promise<MerkleTree>{
   return initalTree;
 }
 
+async function updateServerTree(localTree : MerkleTree) : Promise<any>{
+  const response = await fetch('http://localhost:3000/api/updateTree', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+          tree : localTree,
+      }), // Convert the object to a JSON string
+  });
+  return response.json();
+}
+
 export default function Home() {
   const [state, setState] = useState({
     zkappWorkerClient: null as null | ZkappWorkerClient,
@@ -55,6 +69,8 @@ export default function Home() {
 
   const [userInputValue, setUserInputValue] = useState('');
   const [userInputLeaf, setUserInputLeaf] = useState('');
+  const [userSearchLeaf, setUserSearchLeaf] = useState('');
+  const [searchLeafResult, setSearchLeafResult] = useState('');
 
   // Local merkle tree HAVE TO SYNC WITH SERVER AFER CHAIN IS UPDATED
   const [localMerkleTree, setLocalMerkleTree] = useState(new MerkleTree(10));
@@ -174,56 +190,84 @@ export default function Home() {
     event.preventDefault();
     setState({ ...state, creatingTransaction: true });
 
-    setDisplayText('Creating a transaction...');
-    console.log('Creating a transaction...');
+    try{
+      setDisplayText('Creating a transaction...');
+      console.log('Creating a transaction...');
+      await state.zkappWorkerClient!.fetchAccount({
+        publicKey: state.publicKey!,
+      });
+    }catch{
+      setDisplayText('Error creating the TX');
+      console.log("error creating th TX");
+      setState({ ...state, creatingTransaction: false });
+    }
 
-    await state.zkappWorkerClient!.fetchAccount({
-      publicKey: state.publicKey!,
-    });
+    try{
+      setDisplayText('Generating TX !');
+      console.log('Generating TX !');
+      await state.zkappWorkerClient!.createUpdateTransaction(
+        JSON.stringify({tree : localMerkleTree}),
+        userInputLeaf,
+        String(localMerkleTree.getLeaf(BigInt(userInputLeaf))),
+        userInputValue
+      );  
+    }catch{
+      setDisplayText('error generating the TX');
+      console.log('error generating the TX');
+      setState({ ...state, creatingTransaction: false });
+    }
 
-    setDisplayText('Generating witness...');
-    console.log('Generating witness...');
+    try{
+      setDisplayText('Creating proof...');
+      console.log('Creating proof...');
+      await state.zkappWorkerClient!.proveUpdateTransaction();
 
-    const tempWitness = new MerkleWitness10(localMerkleTree.getWitness(BigInt(userInputLeaf)));
+      setDisplayText('Getting transaction JSON...');
+      console.log('Getting transaction JSON...');
+      const transactionJSON = await state.zkappWorkerClient!.getTransactionJSON();
 
-    setDisplayText('Witeness generated !');
-    console.log('Witness generated !');
+      console.log('Requesting send transaction...');
+      setDisplayText('Requesting send transaction...');
+      const pendingTransaction = await (window as any).mina.sendTransaction({
+        transaction: transactionJSON,
+        feePayer: {
+          fee: transactionFee,
+          memo: '',
+        },
+      });
 
-    setDisplayText('Generating TX !');
-    console.log('Generating TX !');
+      const transactionLink = `https://minascan.io/devnet/tx/${pendingTransaction.hash}`;
+      console.log(`View transaction at ${transactionLink}`);
 
-    await state.zkappWorkerClient!.createUpdateTransaction(
-      JSON.stringify({tree : localMerkleTree}),
-      userInputLeaf,
-      String(localMerkleTree.getLeaf(BigInt(userInputLeaf))),
-      userInputValue
-    );  
+      setTransactionLink(transactionLink);
+      setDisplayText(`View transaction at ${transactionLink}`);
 
-    setDisplayText('Creating proof...');
-    console.log('Creating proof...');
-    await state.zkappWorkerClient!.proveUpdateTransaction();
+      // update local tree with changes
+      const tempTree = localMerkleTree;
+      tempTree.setLeaf(
+        BigInt(userInputLeaf),
+        tempTree.getLeaf(BigInt(userInputLeaf)).add(Field(Number(userInputValue)))
+      );
+      setLocalMerkleTree(tempTree);
 
-    console.log('Requesting send transaction...');
-    setDisplayText('Requesting send transaction...');
-    const transactionJSON = await state.zkappWorkerClient!.getTransactionJSON();
-
-    setDisplayText('Getting transaction JSON...');
-    console.log('Getting transaction JSON...');
-    const { hash } = await (window as any).mina.sendTransaction({
-      transaction: transactionJSON,
-      feePayer: {
-        fee: transactionFee,
-        memo: '',
-      },
-    });
-
-    const transactionLink = `https://minascan.io/devnet/tx/${hash}`;
-    console.log(`View transaction at ${transactionLink}`);
-
-    setTransactionLink(transactionLink);
-    setDisplayText(transactionLink);
+      // and sync server tree with local tree
+      const respose = await updateServerTree(localMerkleTree);
+    }catch{
+      setDisplayText('error sending the TX to the chain');
+      console.log('error sending the TX to the chain');
+      setState({ ...state, creatingTransaction: false });
+    }
 
     setState({ ...state, creatingTransaction: false });
+  };
+
+  // -------------------------------------------------------
+  // Search for latest server tree data
+
+  const onSearchTree = async (event : FormEvent<HTMLFormElement>) : Promise<void> => {
+    event.preventDefault();
+    const tempSearchTree = await fetchTree();
+    setSearchLeafResult(tempSearchTree.getLeaf(BigInt(userSearchLeaf)).toString());
   };
 
   // -------------------------------------------------------
@@ -298,6 +342,26 @@ export default function Home() {
           Current local tree root : {localMerkleTree.getRoot().toString()}
         </div>
         <div>
+
+          <form onSubmit={onSearchTree}>
+            <input
+              type="text"
+              value={userSearchLeaf}
+              onChange={ (event : ChangeEvent<HTMLInputElement>) : void => {
+                setUserSearchLeaf(event.target.value);
+              }}
+              placeholder="Search for a leaf value on the server"
+            />
+            <button 
+              type="submit"
+              disabled = {state.creatingTransaction}
+            >
+              Search
+            </button>
+          </form>
+
+          <p>Search leaf result {searchLeafResult ? searchLeafResult : "   ===> no search done yet ! lunch a search to get a result !"}</p>
+
           <form onSubmit={onSendTransaction}>
             <input
               type="text"
@@ -317,7 +381,7 @@ export default function Home() {
             />
             <button 
               type="submit"
-              // disabled = {state.creatingTransaction}
+              disabled = {state.creatingTransaction}
             >
               Increment the data
             </button>
