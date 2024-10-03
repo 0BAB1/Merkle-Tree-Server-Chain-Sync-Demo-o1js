@@ -7,7 +7,7 @@ import { stat } from 'fs';
 import {Tooltip} from "../components/ToolTipsProps"
 
 let transactionFee = 0.1;
-const ZKAPP_ADDRESS = 'B62qpbRHo9Wy8YA4Xyoo8V5KNKZBWeSfAAM9NcJzfsAQoNBZRADY1EZ';
+const ZKAPP_ADDRESS = 'B62qm6HB5scBLahNUPbX9XLUHHNirzCVESTcCehb8C2NrAoEyf5zZyx';
 
 class MerkleWitness10 extends MerkleWitness(10){}
 
@@ -29,7 +29,7 @@ async function fetchTree() : Promise<MerkleTree>{
   for (const [nodeKey , nodeValue] of Object.entries<{}>(resData.loadedTree.nodes)) {
       for (const [innerKey, innerValue ] of Object.entries<string>(nodeValue)) {
           initalTree.nodes[Number(nodeKey)] = {};
-          initalTree.nodes[Number(nodeKey)][innerKey] = Field(BigInt(innerValue));
+          initalTree.nodes[Number(nodeKey)][innerKey] = Field(Number(innerValue));
       }
   }
   //loading zeroes
@@ -160,6 +160,9 @@ export default function Home() {
           accountExists,
           currentRoot,
         });
+
+        console.log((localMerkleTree.getRoot().toString() == state.currentRoot?.toString()))
+
       }
     })();
   }, []);
@@ -214,7 +217,7 @@ export default function Home() {
         userInputLeaf,
         String(localMerkleTree.getLeaf(BigInt(userInputLeaf))),
         userInputValue
-      );  
+      );
     }catch{
       setDisplayText('error generating the TX');
       console.log('error generating the TX');
@@ -291,6 +294,8 @@ export default function Home() {
 
     // Get the server infos
     setFetchedServerMerkleTree(await fetchTree());
+
+    console.log(localMerkleTree.getRoot().toString(),state.currentRoot?.toString());
   };
 
   // -------------------------------------------------------
@@ -368,11 +373,12 @@ export default function Home() {
                 setUserSearchLeaf(event.target.value);
               }}
               placeholder="Search for a leaf value on the server"
+              className="simple-input"
             />
             <button 
               type="submit"
-              disabled = {state.creatingTransaction}
-              className='button'
+              // disabled = {state.creatingTransaction}
+              className='simple-button'
             >
               Search
             </button>
@@ -388,6 +394,7 @@ export default function Home() {
                 setUserInputValue(event.target.value);
               }}
               placeholder="Increment amount"
+              className="simple-input"
             />
             <input
               type="text"
@@ -396,15 +403,20 @@ export default function Home() {
                 setUserInputLeaf(event.target.value);
               }}
               placeholder="Leaf ID"
+              className="simple-input"
             />
             <button 
               type="submit"
-              disabled = {state.creatingTransaction}
+              // disabled = {state.creatingTransaction}
+              className='simple-button'
             >
               Increment the data
             </button>
           </form>
-          <button onClick={onRefreshCurrentRoot}>
+          <button 
+            onClick={onRefreshCurrentRoot}
+            className='simple-button'
+          >
             Get Latest State
           </button>
         </div>

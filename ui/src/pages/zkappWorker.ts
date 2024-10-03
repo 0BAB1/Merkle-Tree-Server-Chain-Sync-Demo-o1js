@@ -64,7 +64,9 @@ const functions = {
         tempTree.zeroes[i] = Field(BigInt(treeObject.tree.zeroes[i]));
       }
       // generate a witness to send to the contract
+      console.log(BigInt(args.leaf), Number(args.numberBefore))
       const tempWitness = new MerkleWitness10(tempTree.getWitness(BigInt(args.leaf)));
+      console.log(tempWitness.calculateRoot(Field(Number(args.numberBefore)))); // WRONG !!! why though ?
       await state.zkapp!.update(tempWitness, Field(Number(args.numberBefore)), Field(Number(args.incrementAmount)));
     });
     state.transaction = transaction;
